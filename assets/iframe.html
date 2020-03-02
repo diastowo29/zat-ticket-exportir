@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <!--   See Using Zendesk Garden:
+    https://developer.zendesk.com/apps/docs/developer-guide/setup#using-zendesk-garden
+    https://garden.zendesk.com/css-components/bedrock/
+    https://garden.zendesk.com/css-components/utilities/typography/
+   -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/combine/npm/@zendeskgarden/css-bedrock@7.0.21,npm/@zendeskgarden/css-utilities@4.3.0">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+</head>
+<body>
+  <div class="jumbotron text-center">
+    <h1>Ticket Exporter</h1>
+  </div>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-sm-4">
+        <form>
+          <label for="exampleFormControlSelect1">Views</label>
+          <select class="form-control" id="viewOption" onchange="changeViews(this)">
+            <option value="0">Select view</option>
+          </select>
+        </form>
+      </div>
+      <div class="col-sm-4">
+        <form>
+          <label for="exampleFormControlSelect1">Fields</label>
+          <select class="form-control" id="exampleFormControlSelect1">
+            <option>Coming Soon</option>
+          </select>
+        </form>
+      </div>
+      <div class="col-sm-4">
+        <form>
+          <label for="exampleFormControlSelect1">Delimiter</label>
+          <select class="form-control" id="exampleFormControlSelect1" onchange="changeDelimiter(this)">
+            <option value="0">Semicolon (;)</option>
+            <option value="1">Comma (,)</option>
+          </select>
+        </form>
+      </div>
+    </div>
+    <div class="row" style="margin-top: 15px;">
+      <div class="col-sm-12">
+        <button type="button" class="btn btn-success" id="btnExport" style="width: 100%;" onclick="cilukba()" disabled="true">Export (as CSV)</button>
+      </div>
+    </div>
+    <!-- Trigger the modal with a button -->
+    <!-- <button type="button" class="btn btn-info btn-lg" data-toggle="modal" data-target="#myModal">Open Modal</button> -->
+
+    <!-- Modal -->
+    <div id="myModal" class="modal fade" role="dialog" data-backdrop="static" data-keyboard="false">
+      <div class="modal-dialog">
+
+        <!-- Modal content-->
+        <div class="modal-content">
+          <div class="modal-header">
+          </div>
+          <div class="modal-body" align="center">
+            <p>Please wait..</p>
+            <label id="ticket_info">Getting tickets.. (0/0)</label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <script src="https://static.zdassets.com/zendesk_app_framework_sdk/2.0/zaf_sdk.min.js"></script>
+  <script>
+
+    // Watsons Ticket Fields ID
+    var ticketChannel = '360023234893';
+    var ticketType = '360000056874';
+    var ticketCase = '360000054533';
+    var ticketCategory = '114103812473';
+
+    // Rokitv Ticket Fields ID
+    // var ticketChannel = '45197428';
+    // var ticketType = '45286427';
+    // var ticketCase = '45197648';
+    // var ticketCategory = '45197668';
+
+    var delimiterValue = '0';
+    var ticketCounter = 0;
+    var modal = document.getElementById("myModal");
+
+    var client = ZAFClient.init();
+    let csvContent = "data:text/csv;charset=utf-8,";
+    let ticketViewId = '';
+    var ticketRow = [];
+    var ticketFieldsrow = [];
+
+    client.request('/api/v2/views.json').then(
+      function(views) {
+        for (var i=0; i<views.views.length; i++) {
+          if (views.views[i].active) {
+            $("#viewOption").append(new Option(views.views[i].title, views.views[i].id));
+          }
+        }
+        client.request('/api/v2/ticket_fields.json').then (
+          function(customFields) {
+            for (var i=0; i<customFields.ticket_fields.length; i++) {
+              if (customFields.ticket_fields[i].active) {
+                ticketFieldsrow.push({
+                  id: customFields.ticket_fields[i].id,
+                  title: customFields.ticket_fields[i].title
+                })
+              }
+
+            }
+            $("#btnExport").attr("disabled", false);
+        },
+        function(response) {
+          console.error(response);
+        });
+      },
+      function(response) {
+        console.error(response.responseText);
+      });
+
+    function changeViews (views) {
+      var viewId = views.value;
+      ticketViewId = viewId;
+    }
+
+    function changeDelimiter (delimiter) {
+      delimiterValue = delimiter.value;
+    }
+
+    function cilukba () {
+      ticketCounter = 0;
+      var ticketViewUrl = '/api/v2/views/' + ticketViewId + '/tickets.json';
+      if (ticketViewId != '') {
+        $('#myModal').modal('show');
+        $("#btnExport").attr("disabled", true);
+      }
+      generateTickets(ticketViewUrl);
+      ticketRow = [];
+    }
+
+    function generateTickets (url) {
+      csvContent = '';
+      client.request(url).then(
+        function(tickets) {
+          for (var i=0; i<tickets.tickets.length; i++) {
+            ticketCounter++;
+            var thisTicket = tickets.tickets[i];
+            var ticketChannelValue = '';
+            var ticketCaseValue = '';
+            var ticketCategoryValue = '';
+            var ticketTypeValue = '';
+
+            for (var j=0; j<thisTicket.custom_fields.length; j++) {
+              if (thisTicket.custom_fields[j].id == ticketChannel) {
+                ticketChannelValue = thisTicket.custom_fields[j].value;
+              } else if (thisTicket.custom_fields[j].id == ticketCase) {
+                ticketCaseValue = thisTicket.custom_fields[j].value;
+              } else if (thisTicket.custom_fields[j].id == ticketCategory) {
+                ticketCategoryValue = thisTicket.custom_fields[j].value;
+              } else if (thisTicket.custom_fields[j].id == ticketType) {
+                ticketTypeValue = thisTicket.custom_fields[j].value;
+              }
+            }
+
+            var newSubject = '';
+            if (thisTicket.subject === null) {
+              newSubject = '';
+            } else {
+              newSubject = thisTicket.raw_subject.split("\n").join(" ").split("\"").join(" ");
+            }
+
+            var newTicket = [thisTicket.id, "\"" + newSubject + "\"", thisTicket.created_at, thisTicket.updated_at, thisTicket.status, thisTicket.via.channel, ticketChannelValue, ticketCaseValue, ticketTypeValue, ticketCategoryValue];
+            ticketRow.push(newTicket);
+          }
+
+          $("#ticket_info").text("Getting tickets.. (" + ticketCounter + "/" + tickets.count + ")");
+
+          if (tickets.next_page != null) {
+            generateTickets(tickets.next_page);
+          } else {
+            var newDelimiter = '';
+            if (delimiterValue == '0') {
+              newDelimiter = ';';
+            } else {
+              newDelimiter = ',';
+            }
+            csvContent += "Ticket ID" + newDelimiter + "Subject (Raw)" + newDelimiter + "Created at" + newDelimiter + "Updated at" + newDelimiter + "Status" + newDelimiter + "Channel" + newDelimiter + "Ticket Channel" + newDelimiter + "Case" + newDelimiter + "Type" + newDelimiter + "Category\r\n"
+            ticketRow.forEach(function(rowArray) {
+                let row = rowArray.join(newDelimiter);
+                csvContent += row + "\r\n";
+            });
+
+            // var encodedUri = encodeURI(csvContent);
+            // var link = document.createElement("a");
+            // link.setAttribute("href", encodedUri);
+            // link.setAttribute("download", "export.csv");
+            // link.style.visibility = 'hidden';
+            // document.body.appendChild(link); // Required for FF
+
+            // link.click();
+
+            var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement("a");
+            if (link.download !== undefined) {
+                var url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "export_data.csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                $('#myModal').modal('hide');
+            }
+            $("#btnExport").attr("disabled", false);
+          }
+        },
+        function(response) {
+          console.error(response.responseText);
+          // console.log("cobain");
+          $('#myModal').modal('hide');
+          $("#btnExport").attr("disabled", false);
+        }
+      );
+    }
+
+    // client.invoke('resize', { width: '100%', height: '200px' });
+  </script>
+  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+</body>
+</html>
