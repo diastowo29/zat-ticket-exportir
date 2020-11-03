@@ -17,15 +17,15 @@
 
   <div class="container">
     <div class="row">
-      <div class="col-sm-4">
+      <div class="col-sm-3">
         <form>
-          <label for="exampleFormControlSelect1">Views</label>
+          <label for="exampleFormControlSelect1">Ticket Form</label>
           <select class="form-control" id="viewOption" onchange="changeViews(this)">
-            <option value="0">Select view</option>
+            <option value="0">Select Form</option>
           </select>
         </form>
       </div>
-      <div class="col-sm-4">
+      <div class="col-sm-3">
         <form>
           <label for="exampleFormControlSelect1">Fields</label>
           <select class="form-control" id="exampleFormControlSelect1">
@@ -33,7 +33,7 @@
           </select>
         </form>
       </div>
-      <div class="col-sm-4">
+      <div class="col-sm-3">
         <form>
           <label for="exampleFormControlSelect1">Delimiter</label>
           <select class="form-control" id="exampleFormControlSelect1" onchange="changeDelimiter(this)">
@@ -42,10 +42,34 @@
           </select>
         </form>
       </div>
+      <div class="col-sm-3">
+        <form>
+          <label for="selectPeriod">Period</label>
+          <select class="form-control" id="selectPeriod" onchange="onPeriodChange(this)">
+            <option value="all">All</option>
+            <option value="selected">Selected Period</option>
+          </select>
+        </form>
+      </div>
+    </div>
+    <div class="row" id="periodContainer">
+      <div class="col-sm-6">
+        <form>
+          <label for="exampleFormControlSelect1">From</label>
+          <input type="date" class="form-control">
+        </form>
+      </div>
+      <div class="col-sm-6">
+        <form>
+          <label for="exampleFormControlSelect1">To</label>
+          <input type="date" class="form-control">
+          </select>
+        </form>
+      </div>
     </div>
     <div class="row" style="margin-top: 15px;">
       <div class="col-sm-12">
-        <button type="button" class="btn btn-success" id="btnExport" style="width: 100%;" onclick="cilukba()" disabled="true">Export (as CSV)</button>
+        <button type="button" class="btn btn-success" id="btnExport" style="width: 100%;" onclick="doExport()" disabled="true">Export (as CSV)</button>
       </div>
     </div>
     <!-- Trigger the modal with a button -->
@@ -69,19 +93,24 @@
     </div>
   </div>
   <script src="https://static.zdassets.com/zendesk_app_framework_sdk/2.0/zaf_sdk.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
   <script>
+    $('#periodContainer').hide()
+    var viewSelectChanged = false;
 
     // Watsons Ticket Fields ID
-    var ticketChannel = '360023234893';
-    var ticketType = '360000056874';
-    var ticketCase = '360000054533';
-    var ticketCategory = '114103812473';
+    // var ticketChannel = '360023234893';
+    // var ticketType = '360000056874';
+    // var ticketCase = '360000054533';
+    // var ticketCategory = '114103812473';
 
     // Rokitv Ticket Fields ID
-    // var ticketChannel = '45197428';
-    // var ticketType = '45286427';
-    // var ticketCase = '45197648';
-    // var ticketCategory = '45197668';
+    var ticketChannel = '45197428';
+    var ticketType = '45286427';
+    var ticketCase = '45197648';
+    var ticketCategory = '45197668';
 
     var delimiterValue = '0';
     var ticketCounter = 0;
@@ -93,11 +122,11 @@
     var ticketRow = [];
     var ticketFieldsrow = [];
 
-    client.request('/api/v2/views.json').then(
-      function(views) {
-        for (var i=0; i<views.views.length; i++) {
-          if (views.views[i].active) {
-            $("#viewOption").append(new Option(views.views[i].title, views.views[i].id));
+    client.request('/api/v2/ticket_forms.json').then(
+      function(forms) {
+        for (var i=0; i<forms.ticket_forms.length; i++) {
+          if (forms.ticket_forms[i].active) {
+            $("#viewOption").append(new Option(forms.ticket_forms[i].name, forms.ticket_forms[i].name));
           }
         }
         client.request('/api/v2/ticket_fields.json').then (
@@ -109,7 +138,6 @@
                   title: customFields.ticket_fields[i].title
                 })
               }
-
             }
             $("#btnExport").attr("disabled", false);
         },
@@ -121,60 +149,69 @@
         console.error(response.responseText);
       });
 
-    function changeViews (views) {
-      var viewId = views.value;
+    function changeViews (forms) {
+      console.log(forms.value)
+      var viewId = forms.value;
       ticketViewId = viewId;
+      viewSelectChanged = true;
+    }
+
+    function onPeriodChange (select) {
+      if (select.value == 'all') {
+        $('#periodContainer').hide()
+      } else {
+        $('#periodContainer').show()
+      }
     }
 
     function changeDelimiter (delimiter) {
       delimiterValue = delimiter.value;
     }
 
-    function cilukba () {
-      ticketCounter = 0;
-      var ticketViewUrl = '/api/v2/views/' + ticketViewId + '/tickets.json';
-      if (ticketViewId != '') {
-        $('#myModal').modal('show');
-        $("#btnExport").attr("disabled", true);
+    function doExport () {
+      if (viewSelectChanged) {
+        ticketCounter = 0;
+        var ticketViewUrl = '/api/v2/search.json?query=type%3Aticket%20form:"' + ticketViewId + '"';
+        console.log(ticketViewUrl)
+        if (ticketViewId != '') {
+          $('#myModal').modal('show');
+          $("#btnExport").attr("disabled", true);
+        }
+        generateTickets(ticketViewUrl);
+        ticketRow = [];
+      } else {
+        alert('Select view') 
       }
-      generateTickets(ticketViewUrl);
-      ticketRow = [];
     }
 
     function generateTickets (url) {
       csvContent = '';
       client.request(url).then(
         function(tickets) {
-          for (var i=0; i<tickets.tickets.length; i++) {
+          tickets.results.forEach((ticket, index) => {
             ticketCounter++;
-            var thisTicket = tickets.tickets[i];
-            var ticketChannelValue = '';
-            var ticketCaseValue = '';
-            var ticketCategoryValue = '';
-            var ticketTypeValue = '';
 
-            for (var j=0; j<thisTicket.custom_fields.length; j++) {
-              if (thisTicket.custom_fields[j].id == ticketChannel) {
-                ticketChannelValue = thisTicket.custom_fields[j].value;
-              } else if (thisTicket.custom_fields[j].id == ticketCase) {
-                ticketCaseValue = thisTicket.custom_fields[j].value;
-              } else if (thisTicket.custom_fields[j].id == ticketCategory) {
-                ticketCategoryValue = thisTicket.custom_fields[j].value;
-              } else if (thisTicket.custom_fields[j].id == ticketType) {
-                ticketTypeValue = thisTicket.custom_fields[j].value;
+            if (index == 0) {
+              Object.keys(ticket).forEach(function(key) {
+                if (!key.includes('custom_fields') && !(key.includes('fields'))) {
+                    csvContent += '"' + key + '",';
+                }
+              });
+              csvContent += "\r\n";
+            }
+            
+            Object.keys(ticket).forEach(function(key) {
+              if (!key.includes('custom_fields') && !(key.includes('fields'))) {
+                csvContent += '"' +  ticket[key] + '",'
               }
-            }
+            });
+            csvContent += "\r\n";
 
-            var newSubject = '';
-            if (thisTicket.subject === null) {
-              newSubject = '';
-            } else {
-              newSubject = thisTicket.raw_subject.split("\n").join(" ").split("\"").join(" ");
-            }
+          });
 
-            var newTicket = [thisTicket.id, "\"" + newSubject + "\"", thisTicket.created_at, thisTicket.updated_at, thisTicket.status, thisTicket.via.channel, ticketChannelValue, ticketCaseValue, ticketTypeValue, ticketCategoryValue];
-            ticketRow.push(newTicket);
-          }
+          // for (var i=0; i<tickets.results.length; i++) {
+          //   ticketRow.push(tickets.results[i]);
+          // }
 
           $("#ticket_info").text("Getting tickets.. (" + ticketCounter + "/" + tickets.count + ")");
 
@@ -187,20 +224,11 @@
             } else {
               newDelimiter = ',';
             }
-            csvContent += "Ticket ID" + newDelimiter + "Subject (Raw)" + newDelimiter + "Created at" + newDelimiter + "Updated at" + newDelimiter + "Status" + newDelimiter + "Channel" + newDelimiter + "Ticket Channel" + newDelimiter + "Case" + newDelimiter + "Type" + newDelimiter + "Category\r\n"
-            ticketRow.forEach(function(rowArray) {
-                let row = rowArray.join(newDelimiter);
-                csvContent += row + "\r\n";
-            });
-
-            // var encodedUri = encodeURI(csvContent);
-            // var link = document.createElement("a");
-            // link.setAttribute("href", encodedUri);
-            // link.setAttribute("download", "export.csv");
-            // link.style.visibility = 'hidden';
-            // document.body.appendChild(link); // Required for FF
-
-            // link.click();
+            // csvContent += "Ticket ID" + newDelimiter + "Subject (Raw)" + newDelimiter + "Created at" + newDelimiter + "Updated at" + newDelimiter + "Status" + newDelimiter + "Channel" + newDelimiter + "Ticket Channel" + newDelimiter + "Case" + newDelimiter + "Type" + newDelimiter + "Category\r\n"
+            // ticketRow.forEach(function(rowArray) {
+            //     let row = rowArray.join(newDelimiter);
+            //     csvContent += row + "\r\n";
+            // });
 
             var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             var link = document.createElement("a");
@@ -228,8 +256,5 @@
 
     // client.invoke('resize', { width: '100%', height: '200px' });
   </script>
-  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
 </body>
 </html>
